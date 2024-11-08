@@ -5,8 +5,10 @@ import seaborn as sns
 import io
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import plotly.express as px
+from sklearn.model_selection import cross_val_score
+import numpy as np
 
 st.set_page_config(page_title="PROYECTO ML", page_icon="💼", layout="wide")
 
@@ -15,7 +17,7 @@ def df_a_excel(df):
     # Crear un buffer en memoria
     output = io.BytesIO()
     # Escribir el DataFrame a Excel en el buffer
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    with pd.ExcelWriter(output) as writer:
         df.to_excel(writer, index=False, sheet_name="Datos")
     # Volver al inicio del buffer para que pueda ser descargado
     output.seek(0)
@@ -100,7 +102,7 @@ st.markdown(
 
 
 # Menú de opciones
-menu = ["Inicio", "Cargar Datos", "Preprocesamiento de Datos", "Análisis Estadístico", "Visualización de Datos", "Modelado", "Exportar Resultados"]
+menu = ["Inicio", "Cargar Datos", "Preprocesamiento de Datos", "Análisis Estadístico", "Visualización de Datos", "Modelado y Validación", "Exportar Resultados"]
 choice = st.sidebar.selectbox("Menú", menu)
 
 # Manejo de sesión para manipular la información en cada módulo
@@ -110,8 +112,6 @@ if 'data' not in st.session_state:
 # 0. Inicio
 if choice == "Inicio":
     st.subheader("Análisis de Datos y Machine Learning")
-
-    st.image("tec_logo.png", width=200)
     st.title("Sistema de Análisis Financiero para Empresas y Negocios 📊")
     st.header("PROYECTO FINAL")
     st.text("Luis Enrique Batres Martinez - 20130806")
@@ -122,18 +122,23 @@ if choice == "Cargar Datos":
     st.subheader("Carga de Datos")
     
     # Cargar archivo
-    uploaded_file = st.file_uploader("Subir archivo CSV o Excel", type=["csv", "xlsx"])
+    uploaded_file = st.file_uploader("Subir archivo CSV, Excel o JSON", type=["csv", "xlsx", "json"])
     
     if uploaded_file is not None:
         try:
-            # Leer CSV o Excel
+            # Leer CSV, Excel o JSON
             if uploaded_file.name.endswith(".csv"):
                 st.session_state.data = pd.read_csv(uploaded_file)
-            else:
+            elif uploaded_file.name.endswith(".xlsx"):
                 st.session_state.data = pd.read_excel(uploaded_file)
-
+            elif uploaded_file.name.endswith(".json"):
+                st.session_state.data = pd.read_json(uploaded_file)
+            else:
+                st.session_state.data = None
+                st.error("Formato no soportado. Por favor, sube un archivo CSV, Excel o JSON.")
+            
             st.success("Datos cargados exitosamente!")
-            st.dataframe(st.session_state.data.head())  # Mostrar las primeras filas de los datos
+            st.dataframe(st.session_state.data)
         except Exception as e:
             st.error(f"Error al cargar archivo: {e}")
 
@@ -150,19 +155,19 @@ elif choice == "Preprocesamiento de Datos":
         if st.checkbox("Eliminar valores nulos"):
             data = data.dropna()
             st.success("Valores nulos eliminados.")
-            st.dataframe(data.head())
+            st.dataframe(data)
         
         if st.checkbox("Reemplazar valores nulos por 0"):
             data = data.fillna(0)
             st.success("Valores nulos reemplazados por 0.")
-            st.dataframe(data.head())
+            st.dataframe(data)
         
         # Normalización de datos
         if st.checkbox("Normalizar datos"):
             num_cols = data.select_dtypes(include=['float64', 'int64']).columns
             data[num_cols] = (data[num_cols] - data[num_cols].min()) / (data[num_cols].max() - data[num_cols].min())
             st.success("Datos normalizados.")
-            st.dataframe(data.head())
+            st.dataframe(data)
         
         # Actualizar los datos en session_state
         st.session_state.data = data
@@ -177,8 +182,11 @@ elif choice == "Análisis Estadístico":
         st.write("Estadísticas Descriptivas:")
         st.write(st.session_state.data.describe())
 
+        # Seleccionar solo las columnas numéricas para la correlación
+        numeric_data = st.session_state.data.select_dtypes(include=['float64', 'int64'])
+        
         st.write("Correlación entre variables financieras:")
-        st.write(st.session_state.data.corr())
+        st.write(numeric_data.corr())  # Calcula la correlación solo entre las columnas numéricas
     else:
         st.warning("Primero cargue un archivo de datos en la sección 'Cargar Datos'.")
 
@@ -187,40 +195,84 @@ elif choice == "Visualización de Datos":
     st.subheader("Visualización de Datos")
 
     if st.session_state.data is not None:
-        # Visualización interactiva con Plotly
-        st.write("Distribución de Ventas por Mes (Gráfico Interactivo)")
-        fig = px.bar(st.session_state.data, x="Mes", y="Ventas", title="Distribución de Ventas por Mes")
-        st.plotly_chart(fig)
+        # Gráfico de Barras
+        st.write("Distribución de Ventas por Mes (Gráfico de Barras)")
+        fig_bar = px.bar(st.session_state.data, x="Mes", y="Ventas", title="Distribución de Ventas por Mes")
+        st.plotly_chart(fig_bar)
 
+        # Histograma
+        st.write("Distribución de Ventas (Histograma)")
+        fig_hist = px.histogram(st.session_state.data, x="Ventas", nbins=30, title="Distribución de Ventas")
+        st.plotly_chart(fig_hist)
+
+        # Diagrama de Dispersión
+        st.write("Relación entre Ingresos y Ventas (Diagrama de Dispersión)")
+        fig_scatter = px.scatter(st.session_state.data, x="Ingresos", y="Ventas", title="Ingresos vs Ventas")
+        st.plotly_chart(fig_scatter)
+
+        # Mapa de Calor de Correlación entre Variables
         st.write("Mapa de Calor de Correlación entre Variables")
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(st.session_state.data.corr(), annot=True, cmap="coolwarm", ax=ax)
+        numeric_data = st.session_state.data.select_dtypes(include=['float64', 'int64'])
+        sns.heatmap(numeric_data.corr(), annot=True, cmap="coolwarm", ax=ax)
         st.pyplot(fig)
     else:
         st.warning("Primero cargue un archivo de datos en la sección 'Cargar Datos'.")
 
-# 5. Modelado de Machine Learning
-elif choice == "Modelado":
-    st.subheader("Modelado de Machine Learning")
+# 5. Modelado de Aprendizaje Automático y Validación
+elif choice == "Modelado y Validación":
+    st.subheader("Modelado de Aprendizaje Automático y Validación del Modelo")
 
     if st.session_state.data is not None:
-        # Separar características y variable objetivo
-        X = st.session_state.data[['Ingresos', 'Publicidad']]
+        # Seleccionar 'Ingresos' como característica y 'Ventas' como variable objetivo
+        X = st.session_state.data[['Ingresos']]
         y = st.session_state.data['Ventas']
 
         # Dividir en conjuntos de entrenamiento y prueba
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-        # Entrenar modelo de regresión lineal
+        # Entrenar el modelo de regresión lineal
         model = LinearRegression()
+
+        # Validación cruzada con 5 particiones (5-fold cross-validation)
+        cv_scores = cross_val_score(model, X, y, cv=5, scoring='neg_mean_squared_error')
+        cv_rmse = np.sqrt(-cv_scores)  # Convertir el error cuadrático medio negativo a positivo y calcular RMSE
+
+        # Mostrar los resultados de la validación cruzada con valores separados por comas
+        st.write("**Resultados de Validación Cruzada (5-Fold):**")
+        st.write(f"- RMSE por Fold: {', '.join([f'{score:.2f}' for score in cv_rmse])}")
+        st.write(f"- RMSE Promedio: {cv_rmse.mean():.2f}")
+        st.write(f"- Desviación Estándar de RMSE: {cv_rmse.std():.2f}")
+
+        # Entrenar el modelo en el conjunto de entrenamiento
         model.fit(X_train, y_train)
         predictions = model.predict(X_test)
 
-        # Métrica de evaluación
+        # Calcular las métricas de evaluación
         mse = mean_squared_error(y_test, predictions)
-        st.write(f"Error cuadrático medio (MSE): {mse:.2f}")
+        mae = mean_absolute_error(y_test, predictions)
+        r2 = r2_score(y_test, predictions)  # Coeficiente de determinación
+
+        # Mostrar las métricas de evaluación
+        st.write("**Métricas de Evaluación en el Conjunto de Prueba:**")
+        st.write(f"- Error Cuadrático Medio (MSE): {mse:.2f}")
+        st.write(f"- Error Absoluto Medio (MAE): {mae:.2f}")
+        st.write(f"- Coeficiente de Determinación (R²): {r2:.2f}")
+
+        # Visualización del modelo
+        st.write("**Visualización del Modelo:**")
+        fig, ax = plt.subplots()
+        ax.scatter(st.session_state.data['Ingresos'], st.session_state.data['Ventas'], color='blue', label='Datos reales')
+        ax.plot(st.session_state.data['Ingresos'], model.predict(X), color='red', label='Regresión Lineal')
+        ax.set_title('Ingresos vs Ventas')
+        ax.set_xlabel('Ingresos')
+        ax.set_ylabel('Ventas')
+        ax.legend()
+        st.pyplot(fig)
+
     else:
         st.warning("Primero cargue un archivo de datos en la sección 'Cargar Datos'.")
+
 
 # 6. Exportar Resultados
 elif choice == "Exportar Resultados":
