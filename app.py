@@ -100,7 +100,6 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-
 # Menú de opciones
 menu = ["Inicio", "Cargar Datos", "Preprocesamiento de Datos", "Análisis Estadístico", "Visualización de Datos", "Modelado y Validación", "Exportar Resultados"]
 choice = st.sidebar.selectbox("Menú", menu)
@@ -195,21 +194,42 @@ elif choice == "Visualización de Datos":
     st.subheader("Visualización de Datos")
 
     if st.session_state.data is not None:
-        # Gráfico de Barras
+        """Gráfico de Barras: Muestra las ventas e ingresos por mes."""
+        # Gráfico de Barras - Ventas por Mes
         st.write("Distribución de Ventas por Mes (Gráfico de Barras)")
         fig_bar = px.bar(st.session_state.data, x="Mes", y="Ventas", title="Distribución de Ventas por Mes")
         st.plotly_chart(fig_bar)
 
-        # Histograma
+        # Gráfico de Barras - Ingresos por Mes
+        st.write("Distribución de Ingresos por Mes (Gráfico de Barras)")
+        fig_bar_ingresos = px.bar(st.session_state.data, x="Mes", y="Ingresos", title="Distribución de Ingresos por Mes")
+        st.plotly_chart(fig_bar_ingresos)
+
+        """Histograma: Muestra la distribución de las ventas en diferentes rangos."""
+        # Histograma - Distribución de Ventas
         st.write("Distribución de Ventas (Histograma)")
-        fig_hist = px.histogram(st.session_state.data, x="Ventas", nbins=30, title="Distribución de Ventas")
+        fig_hist = px.histogram(st.session_state.data, x="Ventas", title="Distribución de Ventas")
         st.plotly_chart(fig_hist)
 
-        # Diagrama de Dispersión
+        """Gráfico de Líneas: Compara las tendencias mensuales de ingresos, publicidad y ventas."""
+        # Gráfico de Líneas - Tendencias Mensuales
+        st.write("Tendencias de Ingresos, Publicidad y Ventas (Gráfico de Líneas)")
+        fig_line = px.line(st.session_state.data, x="Mes", y=["Ingresos", "Publicidad", "Ventas"], title="Tendencias de Ingresos, Publicidad y Ventas")
+        st.plotly_chart(fig_line)
+
+        """Diagrama de Dispersión: Explora la relación entre ingresos y ventas."""
+        # Diagrama de Dispersión - Ingresos vs Ventas
         st.write("Relación entre Ingresos y Ventas (Diagrama de Dispersión)")
         fig_scatter = px.scatter(st.session_state.data, x="Ingresos", y="Ventas", title="Ingresos vs Ventas")
         st.plotly_chart(fig_scatter)
 
+        """Gráfico de Caja (Box Plot): Permite observar la dispersión y posibles valores atípicos en las ventas."""
+        # Gráfico de Caja - Distribución de Ventas
+        st.write("Distribución de Ventas (Gráfico de Caja)")
+        fig_box = px.box(st.session_state.data, y="Ventas", title="Distribución de Ventas")
+        st.plotly_chart(fig_box)
+
+        """Mapa de Calor: Examina las correlaciones entre ingresos, publicidad y ventas."""
         # Mapa de Calor de Correlación entre Variables
         st.write("Mapa de Calor de Correlación entre Variables")
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -269,7 +289,6 @@ elif choice == "Modelado y Validación":
         ax.set_ylabel('Ventas')
         ax.legend()
         st.pyplot(fig)
-
     else:
         st.warning("Primero cargue un archivo de datos en la sección 'Cargar Datos'.")
 
