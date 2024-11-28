@@ -315,7 +315,7 @@ elif choice == "Exportar Resultados":
     else:
         st.warning("Primero cargue un archivo de datos en la sección 'Cargar Datos'.")
 
-# Pie de página con información del autor
+# Pie de página
 st.markdown(
     """
     <div class="footer">
